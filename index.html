@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Orrery</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <style>body { margin:0; overflow:hidden; }</style>
+</head>
+<body>
+<script>
+let angle = 0;
+
+function setup() {
+  createCanvas(600, 600);
+  angleMode(DEGREES);
+}
+
+function draw() {
+  background(0);
+  translate(width / 2, height / 2);
+  
+  // Sun
+  fill(255, 204, 0);
+  ellipse(0, 0, 80);
+
+  // Planet orbit
+  noFill();
+  stroke(150);
+  ellipse(0, 0, 200);
+
+  // Planet
+  let planetX = cos(angle) * 100;
+  let planetY = sin(angle) * 100;
+  fill(0, 102, 255);
+  ellipse(planetX, planetY, 30);
+
+  angle += 1;
+}
+</script>
+</body>
+</html>
