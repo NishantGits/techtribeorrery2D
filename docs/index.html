@@ -1,40 +1,257 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Simple Orrery</title>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
-  <style>body { margin:0; overflow:hidden; }</style>
-</head>
-<body>
-<script>
-let angle = 0;
+  <head>
+    <title>Orrery with Sun Texture & Fullscreen</title>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: black;
+        color: white;
+        font-family: Arial, sans-serif;
+      }
+      #fullscreen-btn {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        padding: 8px 12px;
+        font-size: 16px;
+        background: #222;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        z-index: 1000;
+        user-select: none;
+      }
+      #speed-label {
+        position: fixed;
+        bottom: 10px;
+        left: 20px;
+        font-size: 16px;
+        user-select: none;
+      }
+      #speed-slider {
+        position: fixed;
+        bottom: 40px;
+        left: 20px;
+        width: 150px;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="fullscreen-btn">Go Fullscreen</button>
+    <div id="speed-label">Speed: 1</div>
+    <input type="range" id="speed-slider" min="0.1" max="5" step="0.1" value="1" />
 
-function setup() {
-  createCanvas(600, 600);
-  angleMode(DEGREES);
-}
+    <script>
+      let planets = [];
+      let textures = {};
+      let sunTexture;
+      let scaleFactor = 1;
 
-function draw() {
-  background(0);
-  translate(width / 2, height / 2);
-  
-  // Sun
-  fill(255, 204, 0);
-  ellipse(0, 0, 80);
+      // Base distances and sizes for scaling
+      const baseDistances = {
+        Mercury: 60,
+        Venus: 100,
+        Earth: 140,
+        Mars: 180,
+        Jupiter: 240,
+        Saturn: 300,
+        Uranus: 360,
+        Neptune: 420
+      };
 
-  // Planet orbit
-  noFill();
-  stroke(150);
-  ellipse(0, 0, 200);
+      const baseSizes = {
+        Mercury: 6,
+        Venus: 9,
+        Earth: 10,
+        Mars: 8,
+        Jupiter: 20,
+        Saturn: 18,
+        Uranus: 15,
+        Neptune: 14
+      };
 
-  // Planet
-  let planetX = cos(angle) * 100;
-  let planetY = sin(angle) * 100;
-  fill(0, 102, 255);
-  ellipse(planetX, planetY, 30);
+      let speedSlider, speedLabel;
+      const canvasBaseSize = 800;
 
-  angle += 1;
-}
-</script>
-</body>
+      function preload() {
+        sunTexture = loadImage(
+          'https://upload.wikimedia.org/wikipedia/commons/1/1e/Sun_surface.jpg',
+          () => console.log('Sun texture loaded.'),
+          err => {
+            console.error('Sun texture failed to load.', err);
+            sunTexture = null;
+          }
+        );
+
+        const urls = {
+          Mercury: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/Mercury_in_true_color.jpg',
+          Venus: 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Venus-real_color.jpg',
+          Earth: 'https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg',
+          Mars: 'https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg',
+          Jupiter: 'https://upload.wikimedia.org/wikipedia/commons/e/e2/Jupiter.jpg',
+          Saturn: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Saturn_during_Equinox.jpg',
+          Uranus: 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Uranus2.jpg',
+          Neptune: 'https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg'
+        };
+
+        for (const [name, url] of Object.entries(urls)) {
+          textures[name] = loadImage(
+            url,
+            () => console.log(`${name} loaded successfully.`),
+            (err) => {
+              console.error(`Failed to load ${name} texture:`, err);
+              textures[name] = null;
+            }
+          );
+        }
+      }
+
+      function setup() {
+        createCanvas(canvasBaseSize, canvasBaseSize);
+        angleMode(DEGREES);
+
+        // Initialize planets
+        for (const name in baseDistances) {
+          let hasRings = name === 'Saturn' || name === 'Uranus';
+          planets.push(new Planet(baseDistances[name], baseSizes[name], getBaseSpeed(name), name, hasRings));
+        }
+
+        speedSlider = document.getElementById('speed-slider');
+        speedLabel = document.getElementById('speed-label');
+        speedSlider.addEventListener('input', () => {
+          speedLabel.textContent = `Speed: ${speedSlider.value}`;
+        });
+
+        // Fullscreen button
+        const fsBtn = document.getElementById('fullscreen-btn');
+        fsBtn.addEventListener('click', toggleFullScreen);
+
+        updateScaleFactor();
+      }
+
+      function draw() {
+        background(0);
+        translate(width / 2, height / 2);
+
+        // Draw the sun with texture
+        push();
+        imageMode(CENTER);
+        noStroke();
+        if (sunTexture) {
+          image(sunTexture, 0, 0, 60 * scaleFactor, 60 * scaleFactor);
+        } else {
+          fill(255, 204, 0);
+          ellipse(0, 0, 60 * scaleFactor, 60 * scaleFactor);
+        }
+        pop();
+
+        // Draw orbits and planets
+        for (let p of planets) {
+          p.update();
+          p.display();
+        }
+      }
+
+      function windowResized() {
+        // Get new width and height, but limit max size when NOT fullscreen
+        let w = windowWidth;
+        let h = windowHeight;
+
+        if (!document.fullscreenElement) {
+          // Limit max size to base canvas size to prevent it growing too big
+          w = Math.min(w, canvasBaseSize);
+          h = Math.min(h, canvasBaseSize);
+        }
+
+        resizeCanvas(w, h);
+        updateScaleFactor();
+      }
+
+      function updateScaleFactor() {
+        scaleFactor = Math.min(width, height) / canvasBaseSize;
+
+        for (let p of planets) {
+          p.dist = baseDistances[p.name] * scaleFactor;
+          p.size = baseSizes[p.name] * scaleFactor;
+        }
+      }
+
+      function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+          this.textContent = 'Exit Fullscreen';
+        } else {
+          document.exitFullscreen();
+          this.textContent = 'Go Fullscreen';
+        }
+      }
+
+      function getBaseSpeed(name) {
+        switch(name) {
+          case 'Mercury': return 1.6;
+          case 'Venus': return 1.2;
+          case 'Earth': return 1;
+          case 'Mars': return 0.8;
+          case 'Jupiter': return 0.5;
+          case 'Saturn': return 0.4;
+          case 'Uranus': return 0.3;
+          case 'Neptune': return 0.25;
+          default: return 1;
+        }
+      }
+
+      class Planet {
+        constructor(dist, size, baseSpeed, name, hasRings = false) {
+          this.dist = dist;
+          this.size = size;
+          this.baseSpeed = baseSpeed;
+          this.angle = random(360);
+          this.name = name;
+          this.hasRings = hasRings;
+          this.texture = textures[name] || null;
+        }
+
+        update() {
+          this.angle += this.baseSpeed * parseFloat(speedSlider.value);
+        }
+
+        display() {
+          let x = cos(this.angle) * this.dist;
+          let y = sin(this.angle) * this.dist;
+
+          stroke(100);
+          noFill();
+          ellipse(0, 0, this.dist * 2);
+
+          push();
+          translate(x, y);
+          noStroke();
+
+          if (this.texture) {
+            imageMode(CENTER);
+            image(this.texture, 0, 0, this.size * 2, this.size * 2);
+          } else {
+            fill(150);
+            ellipse(0, 0, this.size * 2);
+          }
+          pop();
+
+          fill(200);
+          textSize(10 * scaleFactor);
+          textAlign(CENTER);
+          text(this.name, x, y + this.size + 12 * scaleFactor);
+
+          if (this.hasRings) {
+            noFill();
+            stroke(180);
+            ellipse(x, y, this.size * 3, this.size * 1.2);
+          }
+        }
+      }
+    </script>
+  </body>
 </html>
