@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Interactive Orrery</title>
+    <title>Tech Tribe Orrery Alpha (2D)</title>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
     <style>
       html, body {
@@ -30,12 +30,13 @@
   <body>
     <div id="center-holder"></div>
     <div id="controls">
-      <label>Speed:</label>
+      <label>Speed:</label><br>
     </div>
 
     <script>
       let planets = [];
       let speedSlider;
+      let zoomSlider;
       let fsButton;
 
       function setup() {
@@ -44,6 +45,7 @@
 
         angleMode(DEGREES);
 
+        // Create planets with orbit radius (in px), size, speed, name, color
         planets.push(new Planet(60, 6, 1.6, 'Mercury', '#aaa'));
         planets.push(new Planet(100, 9, 1.2, 'Venus', '#c8a16a'));
         planets.push(new Planet(140, 10, 1, 'Earth', '#00f'));
@@ -53,33 +55,42 @@
         planets.push(new Planet(360, 15, 0.3, 'Uranus', '#66ffff', true));
         planets.push(new Planet(420, 14, 0.25, 'Neptune', '#3366ff'));
 
+        // Speed control
         speedSlider = createSlider(0.1, 5, 1, 0.1);
         speedSlider.parent('controls');
 
+        // Zoom control
+        createDiv("<br><label>Zoom:</label>").parent('controls');
+        zoomSlider = createSlider(0.2, 2, 1, 0.01);
+        zoomSlider.parent('controls');
+
+        // Fullscreen button
         fsButton = createButton('Fullscreen');
-        fsButton.position(190, height - 40);
+        fsButton.position(250, height - 40);
         fsButton.mousePressed(() => {
-          let fs = fullscreen();
-          fullscreen(!fs);
+          fullscreen(!fullscreen());
         });
       }
 
       function windowResized() {
         resizeCanvas(windowWidth, windowHeight);
+        fsButton.position(250, height - 40);
       }
 
       function draw() {
         background(0);
         translate(width / 2, height / 2);
 
+        let zoom = zoomSlider.value();
+
         // Draw the sun
         fill('#ffcc00');
         noStroke();
-        ellipse(0, 0, 60, 60);
+        ellipse(0, 0, 60 * zoom, 60 * zoom);
 
         for (let p of planets) {
           p.update();
-          p.display();
+          p.display(zoom);
         }
       }
 
@@ -98,32 +109,36 @@
           this.angle += this.baseSpeed * speedSlider.value();
         }
 
-        display() {
-          let x = cos(this.angle) * this.dist;
-          let y = sin(this.angle) * this.dist;
+        display(zoom) {
+          let distZoomed = this.dist * zoom;
+          let sizeZoomed = this.size * zoom;
+          let x = cos(this.angle) * distZoomed;
+          let y = sin(this.angle) * distZoomed;
 
+          // Orbit
           stroke(100);
           noFill();
-          ellipse(0, 0, this.dist * 2);
+          ellipse(0, 0, distZoomed * 2);
 
+          // Planet
           push();
           translate(x, y);
           noStroke();
           fill(this.color);
-          ellipse(0, 0, this.size * 2);
+          ellipse(0, 0, sizeZoomed * 2);
 
           if (this.hasRings) {
             noFill();
             stroke(180);
-            ellipse(0, 0, this.size * 3, this.size * 1.2);
+            ellipse(0, 0, sizeZoomed * 3, sizeZoomed * 1.2);
           }
-
           pop();
 
+          // Label
           fill(200);
           textSize(10);
           textAlign(CENTER);
-          text(this.name, x, y + this.size + 12);
+          text(this.name, x, y + sizeZoomed + 12);
         }
       }
     </script>
