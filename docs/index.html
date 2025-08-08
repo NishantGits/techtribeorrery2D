@@ -1,146 +1,217 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Tech Tribe Orrery Alpha (2D)</title>
-    <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background-color: black;
+<head>
+  <title>Tech Tribe Orrery Alpha (2D)</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: black;
+    }
+
+    #center-holder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      color: white;
+      font-family: sans-serif;
+      z-index: 10;
+    }
+
+    #controls button {
+      margin: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="center-holder"></div>
+  <div id="controls">
+    <label>Time Control:</label><br>
+    <button onclick="adjustTime(-1)">-1h</button>
+    <button onclick="adjustTime(-24)">-1d</button>
+    <button onclick="adjustTime(-720)">-1mo</button>
+    <button onclick="adjustTime(-8760)">-1yr</button>
+    <button onclick="adjustTime(1)">+1h</button>
+    <button onclick="adjustTime(24)">+1d</button>
+    <button onclick="adjustTime(720)">+1mo</button>
+    <button onclick="adjustTime(8760)">+1yr</button>
+    <br><label>Zoom:</label><br>
+  </div>
+
+  <script>
+    let planets = [];
+    let zoomSlider;
+    let fsButton;
+    let startDate = new Date();
+    let simulatedTime = 0;
+
+    const AU = 149.6e6;
+    const SCALE = 300 / AU;
+    const EARTH_DIAMETER_KM = 12742;
+
+    let zoom = 0.4;
+
+    let moon = null;
+
+    const planetData = [
+      { name: "Mercury", color: "#aaa", orbit: 57.9e6, size: 4879, period: 88 },
+      { name: "Venus", color: "#c8a16a", orbit: 108.2e6, size: 12104, period: 225 },
+      { name: "Earth", color: "#00f", orbit: 149.6e6, size: 12742, period: 365.25 },
+      { name: "Mars", color: "#f00", orbit: 227.9e6, size: 6779, period: 687 },
+      { name: "Jupiter", color: "#ffcc88", orbit: 778.5e6, size: 139820, period: 4331 },
+      { name: "Saturn", color: "#ddcc99", orbit: 1.43e9, size: 116460, period: 10747 },
+      { name: "Uranus", color: "#66ffff", orbit: 2.87e9, size: 50724, period: 30589 },
+      { name: "Neptune", color: "#3366ff", orbit: 4.5e9, size: 49244, period: 59800 }
+    ];
+
+    function setup() {
+      const canvas = createCanvas(windowWidth, windowHeight);
+      canvas.parent('center-holder');
+      angleMode(DEGREES);
+
+      for (let data of planetData) {
+        planets.push(new Planet(data.orbit, data.size, data.period, data.name, data.color));
       }
 
-      #center-holder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
+      moon = new Moon(384400, 3474, 27.3, "#ccc"); // orbitKm, sizeKm, periodDays
+
+      createDiv("<br>").parent('controls');
+      zoomSlider = createSlider(0.05, 2, zoom, 0.01);
+      zoomSlider.parent('controls');
+      zoomSlider.input(() => {
+        zoom = zoomSlider.value();
+      });
+
+      fsButton = createButton('Fullscreen');
+      fsButton.position(300, height - 40);
+      fsButton.mousePressed(() => fullscreen(!fullscreen()));
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      fsButton.position(300, height - 40);
+    }
+
+    function draw() {
+      background(0);
+      translate(width / 2, height / 2);
+
+      zoom = zoomSlider.value();
+      let displayTime = new Date(startDate.getTime() + simulatedTime * 3600 * 1000);
+      fill(255);
+      textSize(16);
+      textAlign(LEFT);
+      text(displayTime.toUTCString(), -width / 2 + 20, -height / 2 + 30);
+
+      fill('#ffcc00');
+      noStroke();
+      ellipse(0, 0, 40 * zoom, 40 * zoom);
+
+      for (let p of planets) {
+        p.update(simulatedTime);
+        p.display(zoom);
+
+        if (p.name === "Earth") {
+          moon.update(simulatedTime);
+          moon.display(zoom, p.pos); // Draw moon relative to Earth
+        }
+      }
+    }
+
+    class Planet {
+      constructor(orbitKm, sizeKm, periodDays, name, color) {
+        this.orbitKm = orbitKm;
+        this.sizeKm = sizeKm;
+        this.period = periodDays;
+        this.name = name;
+        this.color = color;
+        this.pos = createVector(0, 0);
       }
 
-      #controls {
-        position: absolute;
-        bottom: 20px;
-        left: 20px;
-        color: white;
-        font-family: sans-serif;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="center-holder"></div>
-    <div id="controls">
-      <label>Speed:</label><br>
-    </div>
-
-    <script>
-      let planets = [];
-      let speedSlider;
-      let zoomSlider;
-      let fsButton;
-
-      function setup() {
-        const canvas = createCanvas(windowWidth, windowHeight);
-        canvas.parent('center-holder');
-
-        angleMode(DEGREES);
-
-        // Create planets with orbit radius (in px), size, speed, name, color
-        planets.push(new Planet(60, 6, 1.6, 'Mercury', '#aaa'));
-        planets.push(new Planet(100, 9, 1.2, 'Venus', '#c8a16a'));
-        planets.push(new Planet(140, 10, 1, 'Earth', '#00f'));
-        planets.push(new Planet(180, 8, 0.8, 'Mars', '#f00'));
-        planets.push(new Planet(240, 20, 0.5, 'Jupiter', '#ffcc88'));
-        planets.push(new Planet(300, 18, 0.4, 'Saturn', '#ddcc99', true));
-        planets.push(new Planet(360, 15, 0.3, 'Uranus', '#66ffff', true));
-        planets.push(new Planet(420, 14, 0.25, 'Neptune', '#3366ff'));
-
-        // Speed control
-        speedSlider = createSlider(0.1, 5, 1, 0.1);
-        speedSlider.parent('controls');
-
-        // Zoom control
-        createDiv("<br><label>Zoom:</label>").parent('controls');
-        zoomSlider = createSlider(0.2, 2, 1, 0.01);
-        zoomSlider.parent('controls');
-
-        // Fullscreen button
-        fsButton = createButton('Fullscreen');
-        fsButton.position(250, height - 40);
-        fsButton.mousePressed(() => {
-          fullscreen(!fullscreen());
-        });
+      update(hoursSinceStart) {
+        let days = hoursSinceStart / 24;
+        this.angle = (360 * (days % this.period)) / this.period;
+        let distPx = this.orbitKm * SCALE * zoom;
+        this.pos.x = cos(this.angle) * distPx;
+        this.pos.y = sin(this.angle) * distPx;
       }
 
-      function windowResized() {
-        resizeCanvas(windowWidth, windowHeight);
-        fsButton.position(250, height - 40);
-      }
+      display(zoom) {
+        let distPx = this.orbitKm * SCALE * zoom;
+        let sizePx = (this.sizeKm / EARTH_DIAMETER_KM) * 12 * zoom;
+        sizePx = constrain(sizePx, 3, 50);
 
-      function draw() {
-        background(0);
-        translate(width / 2, height / 2);
+        stroke(80);
+        noFill();
+        ellipse(0, 0, distPx * 2);
 
-        let zoom = zoomSlider.value();
-
-        // Draw the sun
-        fill('#ffcc00');
+        fill(this.color);
         noStroke();
-        ellipse(0, 0, 60 * zoom, 60 * zoom);
+        ellipse(this.pos.x, this.pos.y, sizePx);
 
-        for (let p of planets) {
-          p.update();
-          p.display(zoom);
-        }
+        fill(200);
+        textSize(10);
+        textAlign(CENTER);
+        text(this.name, this.pos.x, this.pos.y + sizePx / 2 + 10);
+      }
+    }
+
+    class Moon {
+      constructor(orbitKm, sizeKm, periodDays, color) {
+        this.orbitKm = orbitKm;
+        this.sizeKm = sizeKm;
+        this.period = periodDays;
+        this.color = color;
       }
 
-      class Planet {
-        constructor(dist, size, baseSpeed, name, color, hasRings = false) {
-          this.dist = dist;
-          this.size = size;
-          this.baseSpeed = baseSpeed;
-          this.angle = random(360);
-          this.name = name;
-          this.color = color;
-          this.hasRings = hasRings;
-        }
-
-        update() {
-          this.angle += this.baseSpeed * speedSlider.value();
-        }
-
-        display(zoom) {
-          let distZoomed = this.dist * zoom;
-          let sizeZoomed = this.size * zoom;
-          let x = cos(this.angle) * distZoomed;
-          let y = sin(this.angle) * distZoomed;
-
-          // Orbit
-          stroke(100);
-          noFill();
-          ellipse(0, 0, distZoomed * 2);
-
-          // Planet
-          push();
-          translate(x, y);
-          noStroke();
-          fill(this.color);
-          ellipse(0, 0, sizeZoomed * 2);
-
-          if (this.hasRings) {
-            noFill();
-            stroke(180);
-            ellipse(0, 0, sizeZoomed * 3, sizeZoomed * 1.2);
-          }
-          pop();
-
-          // Label
-          fill(200);
-          textSize(10);
-          textAlign(CENTER);
-          text(this.name, x, y + sizeZoomed + 12);
-        }
+      update(hoursSinceStart) {
+        let days = hoursSinceStart / 24;
+        this.angle = (360 * (days % this.period)) / this.period;
       }
-    </script>
-  </body>
+
+      display(zoom, earthPos) {
+        let distPx = this.orbitKm * SCALE * zoom;
+        let sizePx = (this.sizeKm / EARTH_DIAMETER_KM) * 12 * zoom;
+        sizePx = constrain(sizePx, 2, 20);
+
+        let x = earthPos.x + cos(this.angle) * distPx;
+        let y = earthPos.y + sin(this.angle) * distPx;
+
+        stroke(60);
+        noFill();
+        ellipse(earthPos.x, earthPos.y, distPx * 2); // Orbit around Earth
+
+        fill(this.color);
+        noStroke();
+        ellipse(x, y, sizePx);
+
+        fill(180);
+        textSize(8);
+        textAlign(CENTER);
+        text("Moon", x, y + sizePx / 2 + 8);
+      }
+    }
+
+    function adjustTime(hours) {
+      simulatedTime += hours;
+    }
+
+    function mouseWheel(event) {
+      zoom -= event.delta * 0.001;
+      zoom = constrain(zoom, 0.05, 2);
+      zoomSlider.value(zoom);
+      return false;
+    }
+  </script>
+</body>
 </html>
+
