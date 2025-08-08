@@ -30,6 +30,30 @@
     #controls button {
       margin: 2px;
     }
+
+    /* Added styles for logo and powered-by text */
+    #logo {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+    }
+
+    #logo img {
+      height: 40px;
+      width: auto;
+      display: block;
+    }
+
+    #powered-by {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
@@ -45,6 +69,16 @@
     <button onclick="adjustTime(720)">+1mo</button>
     <button onclick="adjustTime(8760)">+1yr</button>
     <br><label>Zoom:</label><br>
+  </div>
+
+  <!-- Logo top right -->
+  <div id="logo">
+    <img src="https://i.ibb.co/WWhrQPMS/NEW-TECH-TRIBE-LOGO.png" alt="Tech Tribe Logo">
+  </div>
+
+  <!-- Text bottom left -->
+  <div id="powered-by">
+    Powered by the Tech Tribe
   </div>
 
   <script>
@@ -214,4 +248,3 @@
   </script>
 </body>
 </html>
-
